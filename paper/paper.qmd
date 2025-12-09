@@ -41,7 +41,7 @@ places <- read_csv("../data/places_local_data_2025.csv")
 
 Type 2 diabetes remains a major public health issue in the United States, and its burden varies widely across counties [@cdc_places_2023]. County-level measures of health behaviors, chronic conditions, and healthcare access can help identify areas with elevated risk and support data-informed planning [@roth_2017]. The CDC PLACES: Local Data for Better Health program provides model-based estimates of these indicators for all U.S. counties and enables systematic statistical analysis of their associations with diabetes prevalence [@cdc_places_2023].
 
-This study focuses on five county-level measures—obesity, physical inactivity, high blood pressure, current smoking, and routine medical checkups—and examines how well they predict adult diabetes prevalence. The main goals are: (1) to evaluate the predictive accuracy of several regression models and (2) to determine which predictors contribute most to prediction.
+This study focuses on five county-level measures namely, obesity, physical inactivity, high blood pressure, current smoking, and routine medical checkups and examines how well they predict adult diabetes prevalence. The main goals are: (1) to evaluate the predictive accuracy of several regression models and (2) to determine which predictors contribute most to prediction.
 
 All analyses were conducted in R version 4.3.1 [@rcore_2023]. Three models were fit and compared: a multiple linear regression model, a spline-augmented model that allows obesity to have a nonlinear effect [@rcore_splines_2023], and a lasso-regularized model for shrinkage and variable selection [@friedman_glmnet_2010]. Data processing relied on tidyverse tools [@wickham_dplyr_2023; @wickham_ggplot2_2016; @wickham_tidyverse_2019].
 
@@ -53,41 +53,33 @@ The remainder of the paper is organized as follows. The [Data](#data) section de
 
 This analysis uses the 2023 county-level release of the PLACES: Local Data for Better Health dataset \[\@cdc_places_2023\], published by the Centers for Disease Control and Prevention (CDC). PLACES provides model-based estimates of health behaviors, chronic conditions, access-to-care indicators, and related measures for all U.S. counties.
 
-The data file \`places_local_data_2025.csv\` was downloaded from the CDC open data portal.
+The data file `places_local_data_2025.csv` was downloaded from the CDC open data portal. Each row in the raw dataset corresponds to a county–measure pair. Key fields relevant to this analysis include:
 
-Each row in the raw dataset corresponds to a \*\*county–measure\*\* pair. Key variables include:
+-   `LocationName`: county name
+-   `LocationID`: five-digit FIPS county code
+-   `MeasureId`: identifier for each health measure (e.g., DIABETES)
+-   `Data_Value`: estimated crude prevalence (percentage)
+-   `Data_Value_Type`: crude or age-adjusted estimate indicator
 
-\- \`LocationName\`: county name.
+For this study, six county-level measures were extracted from the PLACES dataset:
 
-\- \`LocationID\`: five-digit FIPS county code.
+-   **DIABETES** — estimated percentage of adults who have been told they have diabetes; used as the response variable.
 
-\- \`MeasureId\`: short identifier for a health measure (e.g., \`DIABETES\`).
+-   **OBESITY** — estimated percentage of adults with a body mass index (BMI) of 30 or higher.
 
-\- \`Short_Question_Text\`: descriptive label for the measure.
+-   **LPA** — estimated percentage of adults reporting no leisure-time physical activity.
 
-\- \`Data_Value\`: estimated crude prevalence (percentage).
+-   **BPHIGH** — estimated percentage of adults who have been told they have high blood pressure.
 
-\- \`Data_Value_Type\`: indicates whether the estimate is crude or age-adjusted.
+-   **CSMOKING** — estimated percentage of adults who currently smoke cigarettes.
 
-Selected variablesFor this study, six measures were extracted:
-
-\- DIABETES — adult diabetes prevalence (response).
-
-\- OBESITY — prevalence of obesity (BMI ≥ 30).
-
-\- LPA— prevalence of leisure-time physical inactivity.
-
-\- BPHIGH — prevalence of high blood pressure.
-
-\- CSMOKING — prevalence of current cigarette smoking.
-
-\- CHECKUP — prevalence of having had a routine medical checkup within the past year.
+-   **CHECKUP** — estimated percentage of adults who had a routine medical checkup within the past year.
 
 These measures represent behavioral and cardiovascular risk factors, along with a basic access-to-care indicator.
 
 ### Data preparation
 
-The dataset was filtered to retain only crude prevalence estimates for the six selected measures. Because the raw file is long format, with one row per county–measure pair, the data were reshaped to wide format so that each county appears as a single row with six columns corresponding to the six selected measures.Missing values were removed to ensure consistent model fitting across all counties. This resulted in a final dataset of 2,957 counties with complete information on diabetes prevalence and all five predictors.
+The dataset was filtered to retain only crude prevalence estimates for the six selected measures. Because the raw file is long format, with one row per county–measure pair, the data were reshaped to wide format so that each county appears as a single row with six columns corresponding to the six selected measures. Missing values were removed to ensure consistent model fitting across all counties. This resulted in a final dataset of 2,957 counties with complete information on diabetes prevalence and all five predictors.
 
 ```{r}
 glimpse(places)
