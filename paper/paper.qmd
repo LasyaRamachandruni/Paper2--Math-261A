@@ -1,38 +1,38 @@
 ---
 title: "Predicting County-Level Diabetes Prevalence Using CDC PLACES Data"
-subtitle: "Subtitle"
+subtitle: "County-level predictive modeling with splines and lasso"
 author: "Swathi Sri Lasya Mayukha Ramachandruni"
-thanks: "Project repository available at: [https://github.com/peteragao/MATH261A-project-template](https://github.com/peteragao/MATH261A-project-template)."
 date: today
 date-format: long
-format: html
+
+format:
+  pdf:
+    toc: false
+    number-sections: true
+
 execute:
   echo: true
   warning: false
   message: false
-abstract: "**Abstract**
 
-This study examines the relationship between community health behaviors, health outcomes, healthcare access, and adult diabetes prevalence across U.S. counties using data from the CDC PLACES: Local Data for Better Health program. We investigated how obesity, physical inactivity, high blood pressure, smoking, and routine checkup rates jointly predict county-level diabetes prevalence, and identified which predictors exhibit the strongest associations. Drawing on the 2023 PLACES county release, we constructed a dataset of 2,957 counties with crude adult diabetes prevalence as the dependent variable and five behavioral and healthcare access indicators as predictors.
+abstract: |
+  This study examines the relationship between community health behaviors, health outcomes, healthcare access, and adult diabetes prevalence across U.S. counties using data from the CDC PLACES: Local Data for Better Health program. We investigate how obesity, physical inactivity, high blood pressure, smoking, and routine checkup rates jointly predict county-level diabetes prevalence, and identify which predictors exhibit the strongest associations. Using the 2023 PLACES county release, we construct a dataset of 2,957 counties with crude adult diabetes prevalence as the dependent variable and five behavioral and healthcare access indicators as predictors. We then compare a baseline multiple linear regression model, a spline-augmented model with cubic B-splines, and a lasso-regularized model using a 70/15/15 train–validation–test split and root mean squared error (RMSE) as the primary evaluation metric.
 
-We employed three analytical approaches: a baseline multiple linear regression model, a spline-augmented model incorporating cubic B-splines for obesity, and a lasso-regularized linear model. Using a 70/15/15 train–validation–test split, we evaluated predictive performance through root mean squared error (RMSE). The baseline model accounted for approximately 88% of the variance in diabetes prevalence, with physical inactivity and high blood pressure demonstrating the strongest positive associations, while routine checkups showed a negative association after adjusting for other covariates. The spline specification for obesity yielded modest improvements in validation RMSE compared to the linear specification, suggesting nonlinearity in the obesity–diabetes relationship at the county level. Lasso regularization retained all predictors with similar coefficients but did not enhance test-set performance.
-
-Model diagnostics revealed mild heteroskedasticity, moderate multicollinearity among behavioral and health outcome variables, and several influential counties. However, refitting the spline model after excluding influential observations produced substantively similar coefficient estimates, affirming the robustness of our findings. These results underscore physical inactivity and high blood pressure as the most salient predictors of county-level diabetes prevalence in our models, with routine checkups associated with lower prevalence. We emphasize that these findings represent cross-sectional associations derived from model-based PLACES estimates rather than causal relationships, highlighting the need for longitudinal and intervention-based research to establish causal pathways."
-format: pdf
 bibliography: references.bib
 ---
 
 ```{r}
-#| include: false
-#| warning: false
 #| message: false
+#| warning: false
+#| include: false
 
 library(tidyverse)
-library(palmerpenguins)
-
+library(splines)
+library(glmnet)
+library(car)
+library(lmtest)
 
 places <- read_csv("../data/places_local_data_2025.csv")
-glimpse(places)
-names(places)
 
 
 ```
@@ -52,13 +52,6 @@ The remainder of this paper is organized as follows. The **Data** section descri
 The analysis uses the 2023 county-level release of the PLACES: Local Data for Better Health dataset [@cdc_places_2023], downloaded as a CSV from the CDC open data portal. The file `places_local_data_2025.csv` includes model-based estimates of numerous health-related measures for U.S. counties, including crude prevalence of adult diabetes, obesity, physical inactivity, high blood pressure, current smoking, and receipt of routine checkups. All data manipulation and analysis were conducted in R version 4.3.1 [@rcore_2023] using packages from the tidyverse ecosystem [@wickham_tidyverse_2019], including `dplyr` [@wickham_dplyr_2023] for data wrangling and `ggplot2` [@wickham_ggplot2_2016] for visualization. Statistical modeling employed the `splines` package [@rcore_splines_2023] for nonlinear terms, `glmnet` [@friedman_glmnet_2010] for regularized regression, and `car` [@fox_car_2019] and `lmtest` [@zeileis_lmtest_2002] for diagnostic testing.
 
 ```{r}
-library(tidyverse)
-library(splines)
-library(glmnet)
-library(car)
-library(lmtest)
-
-places <- read_csv("../data/places_local_data_2025.csv")
 
 glimpse(places)
 names(places)
@@ -278,12 +271,44 @@ The baseline model explained approximately 88% of the variation in diabetes prev
 **Spline-Augmented Model**
 
 ```{r}
+# Full-data spline model for OBESITY using quartile knots
+obesity_knots_tv <- quantile(
+  analysis_wide$OBESITY,
+  probs = c(0.25, 0.5, 0.75)
+)
+
+spline_full <- lm(
+  DIABETES ~ bs(OBESITY, knots = obesity_knots_tv, degree = 3) +
+    LPA + BPHIGH + CSMOKING + CHECKUP,
+  data = analysis_wide
+)
+
+# Cook's distance for influence diagnostics
+cooks <- cooks.distance(spline_full)
+
+# Define influential counties using the 4/n rule
+infl_idx <- which(cooks > 4 / nrow(analysis_wide))
+
+length(infl_idx)  # number of influential counties
+
+# Drop influential counties and refit the spline model
+analysis_no_infl <- analysis_wide[-infl_idx, ]
+
+spline_no_infl <- lm(
+  DIABETES ~ bs(OBESITY, knots = obesity_knots_tv, degree = 3) +
+    LPA + BPHIGH + CSMOKING + CHECKUP,
+  data = analysis_no_infl
+)
 summary(spline_full)$coefficients
 
 anova(baseline_mod, spline_full)
 ```
 
 Multiple spline basis terms for obesity were statistically significant (\$p \< 0.01\$), indicating that diabetes prevalence varied nonlinearly with obesity prevalence rather than following a strictly linear relationship. An ANOVA comparing the baseline and spline-augmented models confirmed that adding spline terms for obesity significantly improved model fit (\$F \\approx 39.3\$, \$p \< 2.2 \\times 10\^{-16}\$). The spline specification suggested a stronger marginal effect of obesity at certain ranges of obesity prevalence, though the detailed functional form was encoded in the spline basis rather than captured by a single slope parameter. This nonlinear pattern indicated that the relationship between obesity and diabetes prevalence varied across the distribution of county-level obesity rates.
+
+```{r}
+
+```
 
 **Lasso Regression**
 

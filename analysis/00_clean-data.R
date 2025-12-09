@@ -275,6 +275,156 @@ spline_no_infl <- lm(
 summary(spline_full)$coefficients
 summary(spline_no_infl)$coefficients
 
+# -------------------------------------------------------------------
+# Extension: Nonlinear and interactive effects of LPA & BPHIGH
+# -------------------------------------------------------------------
+
+# Knots for LPA and BPHIGH (same quantile strategy as OBESITY)
+lpa_knots <- quantile(train_df$LPA,    probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+bph_knots <- quantile(train_df$BPHIGH, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+
+lpa_knots
+bph_knots
+
+# -------------------------------------------------------------------
+# 1) All-splines model on training data
+#    Splines for OBESITY, LPA, and BPHIGH; linear CSMOKING and CHECKUP
+# -------------------------------------------------------------------
+spline_all_train <- lm(
+  DIABETES ~
+    bs(OBESITY, knots = obesity_knots, degree = 3) +
+    bs(LPA,     knots = lpa_knots,     degree = 3) +
+    bs(BPHIGH,  knots = bph_knots,     degree = 3) +
+    CSMOKING + CHECKUP,
+  data = train_df
+)
+
+summary(spline_all_train)
+
+valid_rmse_spline_all <- rmse(
+  valid_df$DIABETES,
+  predict(spline_all_train, newdata = valid_df)
+)
+
+test_rmse_spline_all <- rmse(
+  test_df$DIABETES,
+  predict(spline_all_train, newdata = test_df)
+)
+
+c(
+  baseline_valid       = valid_rmse_baseline,
+  obesity_spline_valid = valid_rmse_spline,
+  all_splines_valid    = valid_rmse_spline_all
+)
+
+c(
+  all_splines_test = test_rmse_spline_all
+)
+
+# -------------------------------------------------------------------
+# 2) Interaction model:
+#    OBESITY spline + linear LPA, BPHIGH, and LPA*BPHIGH
+# -------------------------------------------------------------------
+interact_train <- lm(
+  DIABETES ~
+    bs(OBESITY, knots = obesity_knots, degree = 3) +
+    LPA * BPHIGH +        # expands to LPA + BPHIGH + LPA:BPHIGH
+    CSMOKING + CHECKUP,
+  data = train_df
+)
+
+summary(interact_train)
+
+valid_rmse_interact <- rmse(
+  valid_df$DIABETES,
+  predict(interact_train, newdata = valid_df)
+)
+
+test_rmse_interact <- rmse(
+  test_df$DIABETES,
+  predict(interact_train, newdata = test_df)
+)
+
+c(
+  obesity_spline_valid = valid_rmse_spline,
+  interact_valid       = valid_rmse_interact
+)
+
+c(
+  interact_test = test_rmse_interact
+)
+
+# -------------------------------------------------------------------
+# 3) Combined model:
+#    Splines for OBESITY, LPA, BPHIGH + interaction LPA:BPHIGH
+# -------------------------------------------------------------------
+spline_interact_train <- lm(
+  DIABETES ~
+    bs(OBESITY, knots = obesity_knots, degree = 3) +
+    bs(LPA,     knots = lpa_knots,     degree = 3) +
+    bs(BPHIGH,  knots = bph_knots,     degree = 3) +
+    LPA:BPHIGH +
+    CSMOKING + CHECKUP,
+  data = train_df
+)
+
+summary(spline_interact_train)
+
+valid_rmse_spline_interact <- rmse(
+  valid_df$DIABETES,
+  predict(spline_interact_train, newdata = valid_df)
+)
+
+test_rmse_spline_interact <- rmse(
+  test_df$DIABETES,
+  predict(spline_interact_train, newdata = test_df)
+)
+
+c(
+  all_splines_valid     = valid_rmse_spline_all,
+  spline_interact_valid = valid_rmse_spline_interact
+)
+
+c(
+  all_splines_test     = test_rmse_spline_all,
+  spline_interact_test = test_rmse_spline_interact
+)
+
+# -------------------------------------------------------------------
+# 4) RMSE comparison table for all methods
+#    (Original models + new spline/interaction extensions)
+# -------------------------------------------------------------------
+rmse_ext_summary <- tibble::tibble(
+  Model = c(
+    "Baseline linear (validation)",
+    "Obesity spline (validation)",
+    "Lasso (validation)",
+    "Obesity spline (test)",
+    "Lasso (test)",
+    "All splines (validation)",
+    "All splines (test)",
+    "Obesity spline + LPA*BPHIGH (validation)",
+    "Obesity spline + LPA*BPHIGH (test)",
+    "All splines + LPA*BPHIGH (validation)",
+    "All splines + LPA*BPHIGH (test)"
+  ),
+  RMSE = c(
+    valid_rmse_baseline,
+    valid_rmse_spline,
+    valid_rmse_lasso,
+    test_rmse_spline,
+    lasso_test,
+    valid_rmse_spline_all,
+    test_rmse_spline_all,
+    valid_rmse_interact,
+    test_rmse_interact,
+    valid_rmse_spline_interact,
+    test_rmse_spline_interact
+  )
+)
+
+rmse_ext_summary
+
 rmse_summary <- tibble::tibble(
   model = c("Baseline linear", "Spline (validation)", "Lasso (validation)",
             "Spline (test)", "Lasso (test)"),
