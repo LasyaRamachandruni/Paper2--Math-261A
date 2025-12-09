@@ -39,40 +39,64 @@ places <- read_csv("../data/places_local_data_2025.csv")
 
 # Introduction
 
-Type 2 diabetes is a major public health concern in the United States, with substantial geographic disparities in disease burden across counties [@cdc_places_2023]. Understanding how community-level health behaviors, health outcomes, and healthcare access relate to adult diabetes prevalence can help target prevention efforts and inform local policy. County-level surveillance data provide critical insights into the geographic distribution of chronic disease risk factors and outcomes, enabling researchers and policymakers to identify high-burden areas and design tailored interventions [@roth_2017]. Using county-level data from the CDC PLACES: Local Data for Better Health program [@cdc_places_2023], this study examines how factors such as obesity, physical inactivity, high blood pressure, smoking, and routine checkups jointly predict adult diabetes prevalence.
+Type 2 diabetes remains a major public health issue in the United States, and its burden varies widely across counties [@cdc_places_2023]. County-level measures of health behaviors, chronic conditions, and healthcare access can help identify areas with elevated risk and support data-informed planning [@roth_2017]. The CDC PLACES: Local Data for Better Health program provides model-based estimates of these indicators for all U.S. counties and enables systematic statistical analysis of their associations with diabetes prevalence [@cdc_places_2023].
 
-The research questions guiding this investigation are: (1) How do county-level health behaviors, health outcomes, and access to care collectively relate to adult diabetes prevalence across U.S. counties? and (2) Which predictors demonstrate the strongest predictive power for county-level diabetes prevalence? To answer these questions, we conducted analyses in R version 4.3.1 [@rcore_2023] and fit a baseline multiple linear regression model alongside two extensions: a spline-augmented model that allows for nonlinear effects of obesity using the `splines` package [@rcore_splines_2023] and a lasso-regularized model for potential shrinkage and variable selection using the `glmnet` package [@friedman_glmnet_2010]. Data manipulation and visualization were performed using `dplyr` [@wickham_dplyr_2023], `ggplot2` [@wickham_ggplot2_2016], and related `tidyverse` packages [@wickham_tidyverse_2019].
+This study focuses on five county-level measures—obesity, physical inactivity, high blood pressure, current smoking, and routine medical checkups—and examines how well they predict adult diabetes prevalence. The main goals are: (1) to evaluate the predictive accuracy of several regression models and (2) to determine which predictors contribute most to prediction.
 
-The remainder of this paper is organized as follows. The **Data** section describes the CDC PLACES dataset, variable selection, and data preparation procedures. The **Methods** section details the statistical modeling approaches, including baseline regression, spline augmentation, lasso regularization, and model evaluation strategies. The **Results** section presents model performance metrics, coefficient estimates, diagnostic checks, and robustness analyses. Finally, the paper concludes with a discussion of key findings, limitations, and implications for public health policy.
+All analyses were conducted in R version 4.3.1 [@rcore_2023]. Three models were fit and compared: a multiple linear regression model, a spline-augmented model that allows obesity to have a nonlinear effect [@rcore_splines_2023], and a lasso-regularized model for shrinkage and variable selection [@friedman_glmnet_2010]. Data processing relied on tidyverse tools [@wickham_dplyr_2023; @wickham_ggplot2_2016; @wickham_tidyverse_2019].
 
-# Data
+The remainder of the paper is organized as follows. The [Data](#data) section describes the PLACES dataset and construction of the analysis file. The [Methods](#methods) section outlines the predictive modeling approach and diagnostic checks. The [Results](#results) section summarizes model performance and key findings. The [Discussion](#discussion) addresses implications, limitations, and possible extensions.
+
+# Data  {#data}
 
 ### Data source and structure
 
-The analysis uses the 2023 county-level release of the PLACES: Local Data for Better Health dataset [@cdc_places_2023], downloaded as a CSV from the CDC open data portal. The file `places_local_data_2025.csv` includes model-based estimates of numerous health-related measures for U.S. counties, including crude prevalence of adult diabetes, obesity, physical inactivity, high blood pressure, current smoking, and receipt of routine checkups. All data manipulation and analysis were conducted in R version 4.3.1 [@rcore_2023] using packages from the tidyverse ecosystem [@wickham_tidyverse_2019], including `dplyr` [@wickham_dplyr_2023] for data wrangling and `ggplot2` [@wickham_ggplot2_2016] for visualization. Statistical modeling employed the `splines` package [@rcore_splines_2023] for nonlinear terms, `glmnet` [@friedman_glmnet_2010] for regularized regression, and `car` [@fox_car_2019] and `lmtest` [@zeileis_lmtest_2002] for diagnostic testing.
+This analysis uses the 2023 county-level release of the PLACES: Local Data for Better Health dataset \[\@cdc_places_2023\], published by the Centers for Disease Control and Prevention (CDC). PLACES provides model-based estimates of health behaviors, chronic conditions, access-to-care indicators, and related measures for all U.S. counties.
+
+The data file \`places_local_data_2025.csv\` was downloaded from the CDC open data portal.
+
+Each row in the raw dataset corresponds to a \*\*county–measure\*\* pair. Key variables include:
+
+\- \`LocationName\`: county name.
+
+\- \`LocationID\`: five-digit FIPS county code.
+
+\- \`MeasureId\`: short identifier for a health measure (e.g., \`DIABETES\`).
+
+\- \`Short_Question_Text\`: descriptive label for the measure.
+
+\- \`Data_Value\`: estimated crude prevalence (percentage).
+
+\- \`Data_Value_Type\`: indicates whether the estimate is crude or age-adjusted.
+
+Selected variablesFor this study, six measures were extracted:
+
+\- DIABETES — adult diabetes prevalence (response).
+
+\- OBESITY — prevalence of obesity (BMI ≥ 30).
+
+\- LPA— prevalence of leisure-time physical inactivity.
+
+\- BPHIGH — prevalence of high blood pressure.
+
+\- CSMOKING — prevalence of current cigarette smoking.
+
+\- CHECKUP — prevalence of having had a routine medical checkup within the past year.
+
+These measures represent behavioral and cardiovascular risk factors, along with a basic access-to-care indicator.
+
+### Data preparation
+
+The dataset was filtered to retain only crude prevalence estimates for the six selected measures. Because the raw file is long format, with one row per county–measure pair, the data were reshaped to wide format so that each county appears as a single row with six columns corresponding to the six selected measures.Missing values were removed to ensure consistent model fitting across all counties. This resulted in a final dataset of 2,957 counties with complete information on diabetes prevalence and all five predictors.
 
 ```{r}
-
 glimpse(places)
 names(places)
-```
 
-The file is in long format, with one row per county–measure combination. Key variables include \`LocationName\` (county name), \`LocationID\` (5-digit county FIPS code), \`MeasureId\` (measure identifier, e.g., DIABETES, OBESITY), \`Data_Value\` (crude prevalence as a percentage), and \`Short_Question_Text\` (human-readable measure label).
+# Identify variables of interest
+target_ids <- c("DIABETES", "OBESITY", "LPA", "BPHIGH", "CSMOKING", "CHECKUP")
 
-**Construction of analysis dataset**
-
-```{r}
-# 1. Define the measure IDs you want
-target_ids <- c(
-  "DIABETES",  # response
-  "OBESITY",   # obesity
-  "LPA",       # physical inactivity
-  "BPHIGH",    # high blood pressure
-  "CSMOKING",  # current smoking
-  "CHECKUP"    # had a checkup
-)
-
-# 2. Build the long-format analysis data
+# Filter to crude prevalence for selected measures
 analysis_long <- places %>%
   filter(
     MeasureId %in% target_ids,
@@ -88,33 +112,58 @@ analysis_long <- places %>%
     Data_Value
   )
 
-# 3. Pivot to wide format (one row per county)
+# Convert to wide format
 analysis_wide <- analysis_long %>%
   pivot_wider(
-    names_from  = MeasureId,
+    names_from = MeasureId,
     values_from = Data_Value
   ) %>%
   drop_na(DIABETES, OBESITY, LPA, BPHIGH, CSMOKING, CHECKUP)
 
 glimpse(analysis_wide)
+```
+
+### Summary of variables
+
+Basic descriptive summaries are shown below:
+
+```{r}
+summary(analysis_wide[, c("DIABETES", "OBESITY", "LPA", "BPHIGH", "CSMOKING", "CHECKUP")])
+
 
 ```
 
-The resulting dataset contains 2,957 counties with complete data on all selected variables. Adult diabetes prevalence ranges from approximately 5 to 27 percent, with a mean of around 13.6 percent. Obesity, physical inactivity, and high blood pressure are moderately to strongly positively correlated, reflecting shared underlying risk profiles across counties.
+Diabetes prevalence ranges from roughly 5% to 27%, with a mean near 13.6%. Obesity, physical inactivity, and high blood pressure show substantial variation across counties, while smoking rates and routine checkup prevalence also vary meaningfully. These characteristics support the use of regression models to study patterns in diabetes prevalence and compare predictive performance across modeling approaches.
 
-# Methods
+# Methods  {#methods}
 
-**Modeling strategy**
+### Modeling goals
 
-The analysis proceeds in three stages to address the research questions and evaluate predictive performance across model specifications.
+The primary aim of this analysis is **prediction** of adult diabetes prevalence at the county level. To evaluate predictive performance, the dataset is divided into training (70%), validation (15%), and test (15%) subsets. Models are fit on the training set, tuned using the validation set, and assessed using root mean squared error (RMSE) on both validation and test sets. A secondary objective is to describe how the predictors relate to diabetes prevalence within the limitations of a cross-sectional ecological dataset. These relationships are interpreted as **associations**, not causal effects.
 
-1. **Baseline model (OLS)**: Fit a multiple linear regression of diabetes prevalence on five predictors: obesity, physical inactivity, high blood pressure, current smoking, and routine checkups.
+### Baseline linear model
 
-2. **Spline-augmented model**: Extend the baseline model by allowing a nonlinear effect of obesity using cubic regression splines \[\@rcore_splines_2023\] with knots at the empirical quartiles of county-level obesity prevalence.
+The starting point is a multiple linear regression model of diabetes prevalence on the five selected predictors: obesity, physical inactivity, high blood pressure, current smoking, and routine checkups. This model provides a useful benchmark because it is easy to interpret and often performs well for prediction when the relationships are approximately linear.
 
-3. **Lasso model**: Fit a lasso-regularized linear regression \[\@friedman_glmnet_2010\] using the same predictors, with the penalty parameter selected by cross-validation, to assess whether shrinkage improves out-of-sample prediction.
+### Spline-augmented model for obesity
 
-The dataset is randomly split into training (70%), validation (15%), and test (15%) sets. The training data are used to fit the baseline, spline, and lasso models; validation RMSE is used to tune spline knots and the lasso penalty parameter; and the test set is used for final evaluation of predictive performance.
+Visual inspection of residual–fitted plots from the baseline model suggested that the association between obesity and diabetes may not be well described by a single linear term. To allow for **nonlinear** structure while maintaining a relatively simple model, obesity is represented using a cubic B-spline basis with knots placed at the 25th, 50th, and 75th percentiles of the obesity distribution. This approach introduces flexibility only where needed and prevents overfitting by keeping the same linear structure for the other predictors.
+
+### Lasso-regularized linear model
+
+To evaluate whether shrinkage can improve prediction, a lasso-regularized regression model is fit using the `glmnet` package. The lasso adds a penalty that can reduce the magnitude of regression coefficients and, in higher-dimensional settings, remove variables entirely. Although all five predictors are expected to contribute information, the lasso provides a systematic way to test whether small improvements in RMSE can be obtained through shrinkage. The penalty parameter is chosen using 10-fold cross-validation.
+
+### Diagnostic rationale
+
+Although prediction is the primary goal, diagnostic checks are important for assessing whether the fitted models behave as expected and whether the estimated relationships are stable.
+
+-   **Variance inflation factors (VIFs)** are used to examine multicollinearity among predictors in the baseline linear model. Multicollinearity does not necessarily harm predictive accuracy, but it can increase the variability of coefficient estimates. Since the paper also reports descriptive associations, VIFs help gauge how sensitive individual coefficient estimates might be to correlated predictors.
+
+-   **Residual diagnostics** (residual–fitted, scale–location, and normal QQ plots) are used to check for systematic patterns, unequal variance, or strong departures from approximate normality. These checks help identify when nonlinear modeling (such as splines) may be appropriate.
+
+-   **Cook’s distance** is used to identify influential counties. In spline models, influential points may distort local curvature, especially near knot locations. To assess whether a small number of counties drives the fitted relationships, the spline model is refit after removing observations with Cook’s distance larger than (4/n), and the resulting coefficients are compared to those obtained using all counties.
+
+Together, these modeling choices and diagnostics support the predictive goal while ensuring that the relationships reported in the Results section are not artifacts of multicollinearity, model misspecification, or a few influential observations.
 
 ```{r}
 set.seed(261)
@@ -250,7 +299,9 @@ c(lasso_valid = lasso_valid,
 
 Diagnostics for the spline model are examined using residual plots, Cook's distance, and robustness checks to assess model assumptions and the influence of individual counties on parameter estimates.
 
-# Results
+## Discussion {#discussion}
+
+# Results  {#results}
 
 **Descriptive Statistics**
 
