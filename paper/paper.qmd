@@ -128,39 +128,46 @@ glimpse(analysis_wide)
 ```
 
 ```{r}
-#|label="table-descr", echo=FALSE
+#| label: tbl-descriptive-stats
+#| echo: false
+
 library(dplyr)
+library(tidyr)
 library(knitr)
 
 descriptives <- analysis_wide %>%
   summarise(
-    across(c(DIABETES, OBESITY, LPA, BPHIGH, CSMOKING, CHECKUP),
-           list(
-             N = ~n(),
-             Mean = ~mean(.),
-             SD = ~sd(.),
-             Min = ~min(.),
-             Q1 = ~quantile(., 0.25),
-             Median = ~median(.),
-             Q3 = ~quantile(., 0.75),
-             Max = ~max(.)
-           )
+    across(
+      c(DIABETES, OBESITY, LPA, BPHIGH, CSMOKING, CHECKUP),
+      list(
+        Mean = ~mean(.),
+        SD = ~sd(.),
+        Min = ~min(.),
+        Q1 = ~quantile(., 0.25),
+        Median = ~median(.),
+        Q3 = ~quantile(., 0.75),
+        Max = ~max(.)
+      )
     )
   ) %>%
-  tidyr::pivot_longer(
-    everything(),
-    names_to = c("variable","stat"),
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Variable", "Statistic"),
     names_sep = "_",
-    values_to = "value"
+    values_to = "Value"
   ) %>%
-  tidyr::pivot_wider(
-    names_from = stat,
-    values_from = value
+  pivot_wider(
+    names_from = Statistic,
+    values_from = Value
   ) %>%
-  mutate(across(where(is.numeric), ~ round(., 2))) # rounding
+  mutate(across(where(is.numeric), ~ round(., 2)))
 
 descriptives %>%
-  kable(caption = "Table 1: Descriptive statistics for county-level variables")
+  kable(
+    caption = "Descriptive statistics for county-level variables (N = 2957)",
+    booktabs = TRUE
+  )
+
 
 ```
 
@@ -177,7 +184,24 @@ cat("Counties retained (wide form, complete data):", n_wide, "\n")
 
 ```
 
-Table @ref(tbl-descriptive-stats) displays summary statistics for the outcome (diabetes prevalence) and the five predictors across all counties analyzed. County-level diabetes prevalence ranges from X% to Y%, with an average of \~13.6% and standard deviation of Z%. Obesity, physical inactivity, and high blood pressure rates show similar variation, while smoking rates and routine checkup rates appear less variable.
+@tbl-descriptive-stats displays summary statistics for the outcome (diabetes prevalence) and the five predictors across all counties analyzed. County-level diabetes prevalence ranges from 4.9% to 27.1%, with a mean of 13.6% and standard deviation of 2.78%. Obesity prevalence ranges from 16.7% to 52.9% (mean 37.4%), physical inactivity from 12.1% to 49.5% (mean 28.5%), and high blood pressure from 17.3% to 59.8% (mean 38.7%). Smoking rates range from 6.4% to 39.8% (mean 15.8%), while routine checkup rates range from 63.4% to 87.0% (mean 77.7%). These patterns show substantial county-level variation in behavioral and cardiovascular risk factors.
+
+```{r}
+#|label="fig-hist-vars" 
+#|fig-cap="Distributions of key variables: diabetes and predictors", fig.width=7, fig.height=7}
+library(ggplot2)
+
+analysis_wide %>%
+  pivot_longer(c(DIABETES, OBESITY, LPA, BPHIGH, CSMOKING, CHECKUP),
+               names_to="Variable", values_to="Value") %>%
+  ggplot(aes(x=Value)) +
+  geom_histogram(bins=30, fill="steelblue", color="white") +
+  facet_wrap(~Variable, scales="free_x") +
+  theme_minimal() +
+  labs(x="Percentage", y="Count")
+```
+
+Figure @fig-hist-vars shows the distribution of each variable across counties, helping visualize spread and potential skew.
 
 After filtering the original PLACES dataset to include only crude prevalence estimates and complete cases for our six selected measures, the final sample comprises 2,957 counties. Counties with missing values for any of the key measures were excluded. Because missingness is likely non-random (e.g. smaller or rural counties may have less data), the results may not generalize to all U.S. counties — this is considered further in the Discussion.
 
@@ -439,32 +463,6 @@ summary(spline_no_infl)$coefficients
 ```
 
 ## Descriptive summaries
-
-```{r}
-#| label: tbl-desc-stats 
-library(dplyr)
-
-analysis_wide %>%
-  summarise(
-    across(
-      c(DIABETES, OBESITY, LPA, BPHIGH, CSMOKING, CHECKUP),
-      list(
-        Mean = ~mean(.),
-        SD   = ~sd(.),
-        Min  = ~min(.),
-        Max  = ~max(.)
-      )
-    )
-  ) %>%
-  # Round values for readability
-  mutate(across(everything(), ~ round(., 2))) %>%
-  knitr::kable(
-    caption = "Descriptive statistics for county-level variables (N = 2957)"
-  )
-
-```
-
-Table @ref(tbl-desc-stats) shows the mean, standard deviation, and range (min to max) for each of the six county-level variables used in the analysis.
 
 Diabetes prevalence ranges from roughly 5% to 27%, with a mean near 13.6%. Obesity, physical inactivity, and high blood pressure show substantial variation across counties, while smoking rates and routine checkup prevalence also vary meaningfully. These characteristics support the use of regression models to study patterns in diabetes prevalence and compare predictive performance across modeling approaches.
 
