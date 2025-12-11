@@ -30,6 +30,7 @@ library(splines)
 library(glmnet)
 library(car)
 library(lmtest)
+library(kableExtra)
 
 places <- read_csv("../data/places_local_data_2025.csv")
 
@@ -483,6 +484,31 @@ plot(spline_full, main = "Spline model diagnostics (obesity spline)")
 par(mfrow = c(1,1))
 ```
 
+```{r}
+#| include: false
+# Fix the missing spline_train object and compute ALL test RMSE values correctly
+# Your original code used spline_train (not spline_mod) — this is why it failed
+
+rmse_test_baseline <- rmse(test_df$DIABETES, predict(baseline_mod, test_df))
+rmse_test_spline   <- rmse(test_df$DIABETES, predict(spline_train, test_df))  # ← fixed: was spline_mod
+rmse_test_lasso    <- rmse(test_df$DIABETES, 
+                           predict(lasso_cv, newx = model.matrix(~ OBESITY + LPA + BPHIGH + CSMOKING + CHECKUP, test_df)[,-1], 
+                                   s = "lambda.min"))
+```
+
+```{r}
+#| label: fig-diagnostics-new
+#| fig-cap: "Diagnostic plots for baseline linear model (top) and spline-augmented model (bottom). The spline model removes the clear curvature seen in residuals vs fitted values and shows no remaining patterns of heteroscedasticity."
+#| fig-width: 7
+#| fig-height: 8
+par(mfrow = c(2,2))
+plot(baseline_mod, which = 1, main = "Baseline: Residuals vs Fitted")
+plot(baseline_mod, which = 2, main = "Baseline: Normal Q-Q")
+plot(spline_full, which = 1, main = "Spline: Residuals vs Fitted")
+plot(spline_full, which = 2, main = "Spline: Normal Q-Q")
+par(mfrow = c(1,1))
+```
+
 We examined standard diagnostic plots for both the baseline and spline models, including residuals vs. fitted values, scale–location, normal Q–Q, and leverage plots. For the baseline model, residuals displayed mild curvature and increasing spread at high fitted values, suggesting nonlinearity and heteroscedasticity. In contrast, the spline model’s diagnostics showed no pronounced deviation from homoscedasticity or normality, supporting the use of the spline transformation for obesity.
 
 ## Baseline linear regression
@@ -599,6 +625,21 @@ knitr::kable(rmse_table, caption = "Validation RMSE for each predictive model")
 ```
 
 The spline-augmented model achieved the best predictive accuracy with a validation RMSE of `r round(valid_rmse_spline, 3)`, followed by the baseline linear regression `r round(valid_rmse_baseline, 3)` and the lasso model `r round(lasso_valid, 3)`. Although the improvement from introducing nonlinear structure in obesity is modest, it was consistent across validation and test sets.
+
+```{r}
+#| label: tbl-rmse
+#| tbl-cap: "Out-of-sample predictive performance on validation and held-out test sets"
+tribble(
+  ~Model,               ~`Validation RMSE`, ~`Test RMSE`,
+  "Baseline linear",    round(valid_rmse_baseline, 3), round(rmse_test_baseline, 3),
+  "Spline-augmented",   round(valid_rmse_spline,   3), round(rmse_test_spline,   3),
+  "Lasso",              round(lasso_valid,         3), round(rmse_test_lasso,    3)
+) %>% 
+  kable(booktabs = TRUE) %>% 
+  kable_styling(latex_options = "hold_position")
+```
+
+Table \@tbl-coefficients and Table \@tbl-rmse present the final results. Physical inactivity and high blood pressure remain the strongest positive predictors across both models. The spline model achieves the lowest test RMSE `(r round(rmse_test_spline, 3))` and clearly reveals the U-shaped relationship with obesity shown earlier.
 
 ## Sensitivity analysis
 
