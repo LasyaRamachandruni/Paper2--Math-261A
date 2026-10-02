@@ -1,17 +1,40 @@
-# MATH261A-project-template
-Example project repository for MATH 261A.
+# Predicting County-Level Diabetes Prevalence with CDC PLACES Data
 
-## Data 
+Final paper for MATH 261A (Regression Theory and Methods).
 
-**Example statement:** Data used in this project is obtained from [San Francisco Open Data](https://data.sfgov.org) who provide the data under the [Open Data Commons Public Domain Dedication and License](https://opendatacommons.org/licenses/pddl/1-0/).
+Can five community health indicators predict how common diabetes is in a U.S. county? Using 2,957 counties from the CDC PLACES dataset, this project compares three regression models:
 
-## External Resources
+| Model | Idea |
+|---|---|
+| Ordinary least squares | Linear baseline on all five predictors |
+| Cubic B-spline | Lets the effect of obesity bend instead of forcing a straight line |
+| Lasso | Shrinks coefficients to check which predictors matter |
 
-**Example statement:** The final report and code were written by [your name], but the following resources were used for preliminary research:
+**Predictors:** obesity, physical inactivity, high blood pressure, current smoking and routine checkup rates (crude prevalence).
 
-* LLM-based chatbots (ex. ChatGPT Edu)
-* Online forums (ex. Stack Overflow).
+## Findings
 
-# Acknowledgments
+- The **spline model predicts best** (RMSE 0.902 on validation, 0.905 on test).
+- The relationship between obesity and diabetes prevalence is **U-shaped**, which a linear model misses.
+- **Physical inactivity** and **high blood pressure** are the strongest positive predictors; higher **checkup** rates go with lower diabetes prevalence.
 
-This project repository is based on the template provided by [Rohan Alexander](https://github.com/RohanAlexander/starter_folder/tree/main).
+The full write-up, including diagnostics and model comparison, is in [`paper/paper.qmd`](paper/paper.qmd).
+
+## Data
+
+[CDC PLACES: Local Data for Better Health](https://www.cdc.gov/places/), county-level estimates, saved as `data/places_local_data_2025.csv`. PLACES is published by the CDC as public data.
+
+`analysis/00_clean-data.R` filters the five predictors and the diabetes outcome and reshapes the data to one row per county.
+
+## Project layout
+
+```
+analysis/00_clean-data.R   data cleaning and reshaping
+data/                      CDC PLACES extract
+paper/paper.qmd            the paper (Quarto), with all modeling code
+paper/references.bib       bibliography
+```
+
+## Acknowledgments
+
+Repository structure based on the MATH 261A template, adapted from [Rohan Alexander's starter folder](https://github.com/RohanAlexander/starter_folder).
