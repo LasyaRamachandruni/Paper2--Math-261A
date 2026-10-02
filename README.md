@@ -38,3 +38,18 @@ paper/references.bib       bibliography
 ## Acknowledgments
 
 Repository structure based on the MATH 261A template, adapted from [Rohan Alexander's starter folder](https://github.com/RohanAlexander/starter_folder).
+
+## Rendering the paper
+
+The paper is a [Quarto](https://quarto.org) document that runs all analysis code when rendered.
+
+```r
+install.packages(c("tidyverse", "splines", "glmnet", "car", "lmtest", "kableExtra"))
+install.packages("tinytex"); tinytex::install_tinytex()   # LaTeX, needed for PDF output
+```
+
+```bash
+quarto render paper/paper.qmd    # writes paper/paper.pdf
+```
+
+Quarto runs the code from inside `paper/`, which is why the data is read from `../data/`.
